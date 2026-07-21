@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>紙上實盤</title>
+<style>
+:root{
+  --page:#f4f5f7; --card:#ffffff; --ink:#1a1d21; --muted:#6b7280;
+  --grid:#e7e9ee; --baseline:#9aa1ad; --accent:#2f6fed; --accent-dim:rgba(47,111,237,.12);
+  --up:#c2403a; --down:#1e9e6a; --card-shadow:0 1px 3px rgba(16,24,40,.08);
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --page:#0f1115; --card:#171a21; --ink:#e8eaed; --muted:#8b93a1;
+    --grid:#262b35; --baseline:#59616e; --accent:#5b8dee; --accent-dim:rgba(91,141,238,.16);
+    --up:#ff6f66; --down:#39d296; --card-shadow:0 1px 3px rgba(0,0,0,.4);
+  }
+}
+*{box-sizing:border-box; margin:0}
+body{
+  background:var(--page); color:var(--ink);
+  font:15px/1.55 -apple-system,"Segoe UI","Microsoft JhengHei",system-ui,sans-serif;
+  padding:14px 12px calc(20px + env(safe-area-inset-bottom));
+  max-width:560px; margin:0 auto;
+  -webkit-text-size-adjust:100%;
+}
+h1{font-size:19px; letter-spacing:.5px}
+.sub{color:var(--muted); font-size:12.5px; margin:2px 0 12px}
+.card{background:var(--card); border-radius:14px; box-shadow:var(--card-shadow);
+  padding:14px; margin-bottom:12px; border:1px solid var(--grid)}
+.card h2{font-size:13px; color:var(--muted); font-weight:600; letter-spacing:1px; margin-bottom:8px}
+.num{font-variant-numeric:tabular-nums}
+.pos{color:var(--up)} .neg{color:var(--down)}
+
+/* KPI */
+.kpis{display:grid; grid-template-columns:repeat(3,1fr); gap:8px 4px}
+.kpi .l{font-size:11.5px; color:var(--muted)}
+.kpi .v{font-size:17px; font-weight:650; font-variant-numeric:tabular-nums}
+.kpi.big .v{font-size:22px}
+
+/* NAV chart */
+.pnav{margin:10px -4px 0}
+.pnav svg{display:block; width:100%; height:auto; touch-action:pan-y}
+.pnav text{font-size:11px; fill:var(--muted); font-variant-numeric:tabular-nums}
+.pnav .endlbl{font-size:12px; font-weight:650; fill:var(--ink)}
+.plegend{display:flex; gap:14px; font-size:11.5px; color:var(--muted); padding:0 4px 2px}
+.plegend i{display:inline-block; width:14px; height:3px; border-radius:2px; vertical-align:middle; margin-right:5px}
+#tip{position:fixed; display:none; background:var(--card); color:var(--ink);
+  border:1px solid var(--grid); border-radius:8px; box-shadow:var(--card-shadow);
+  font-size:12.5px; padding:5px 9px; pointer-events:none; z-index:9; white-space:nowrap;
+  font-variant-numeric:tabular-nums}
+#tip .b{color:var(--muted)}
+
+/* positions */
+table{width:100%; border-collapse:collapse; font-variant-numeric:tabular-nums}
+th{font-size:11px; color:var(--muted); font-weight:600; text-align:right; padding:3px 0; border-bottom:1px solid var(--grid)}
+td{font-size:13.5px; text-align:right; padding:6px 0; border-bottom:1px solid var(--grid)}
+tr:last-child td{border-bottom:none}
+th.l,td.l{text-align:left}
+.nm{font-weight:600} .cd{color:var(--muted); font-size:11.5px; margin-left:4px}
+
+/* signals */
+.srow{display:flex; align-items:center; gap:8px; padding:5px 0; border-bottom:1px solid var(--grid); font-size:13.5px}
+.srow:last-child{border-bottom:none}
+.srank{color:var(--muted); font-size:12px; width:18px; text-align:right; font-variant-numeric:tabular-nums}
+.sname{flex:0 0 auto; min-width:104px}
+.sbar{flex:1; height:5px; border-radius:3px; background:var(--accent-dim); overflow:hidden}
+.sbar i{display:block; height:100%; background:var(--accent); border-radius:3px}
+.sscore{color:var(--muted); font-size:12px; width:40px; text-align:right; font-variant-numeric:tabular-nums}
+.hold{font-size:10.5px; color:var(--accent); border:1px solid var(--accent);
+  border-radius:4px; padding:0 4px; margin-left:4px; vertical-align:1px}
+.watch{color:var(--muted); font-size:12px; margin-top:8px; line-height:1.7}
+.pend{background:var(--accent-dim); border-radius:8px; padding:8px 10px; font-size:13px; margin-top:10px}
+
+.meta{color:var(--muted); font-size:12px; line-height:1.7}
+.foot{color:var(--muted); font-size:11.5px; text-align:center; margin-top:16px}
+</style>
+</head>
+<body>
+<h1>📒 紙上實盤</h1>
+<div class="sub" id="sub"></div>
+<div id="main"></div>
+<div class="foot">虛擬帳戶模擬,非投資建議・每日收盤後更新</div>
+<div id="tip"></div>
+<script>
+const D = {"date": "2026-07-20", "is_rebalance_day": false, "strategies": {"momentum_chips": {"top_n": 15, "list": [{"rank": 1, "stock_id": "7610", "name": "聯友金屬-創", "score": 0.9889}, {"rank": 2, "stock_id": "6274", "name": "台燿", "score": 0.9537}, {"rank": 3, "stock_id": "6141", "name": "柏承", "score": 0.9537}, {"rank": 4, "stock_id": "6683", "name": "雍智科技", "score": 0.9363}, {"rank": 5, "stock_id": "6693", "name": "廣閎科", "score": 0.9363}, {"rank": 6, "stock_id": "6949", "name": "沛爾生醫-創", "score": 0.9318}, {"rank": 7, "stock_id": "3532", "name": "台勝科", "score": 0.9195}, {"rank": 8, "stock_id": "8046", "name": "南電", "score": 0.919}, {"rank": 9, "stock_id": "3026", "name": "禾伸堂", "score": 0.9169}, {"rank": 10, "stock_id": "2478", "name": "大毅", "score": 0.9169}, {"rank": 11, "stock_id": "4991", "name": "環宇-KY", "score": 0.9145}, {"rank": 12, "stock_id": "5475", "name": "德宏", "score": 0.9134}, {"rank": 13, "stock_id": "8155", "name": "博智", "score": 0.9131}, {"rank": 14, "stock_id": "6488", "name": "環球晶", "score": 0.9114}, {"rank": 15, "stock_id": "2483", "name": "百容", "score": 0.907}, {"rank": 16, "stock_id": "4127", "name": "天良", "score": 0.9069}, {"rank": 17, "stock_id": "4534", "name": "慶騰", "score": 0.903}, {"rank": 18, "stock_id": "6291", "name": "沛亨", "score": 0.9001}, {"rank": 19, "stock_id": "3055", "name": "蔚華科", "score": 0.898}, {"rank": 20, "stock_id": "6147", "name": "頎邦", "score": 0.898}, {"rank": 21, "stock_id": "6226", "name": "光鼎", "score": 0.8961}, {"rank": 22, "stock_id": "8021", "name": "尖點", "score": 0.8947}, {"rank": 23, "stock_id": "4908", "name": "前鼎", "score": 0.8933}, {"rank": 24, "stock_id": "2472", "name": "立隆電", "score": 0.8909}, {"rank": 25, "stock_id": "6173", "name": "信昌電", "score": 0.8852}, {"rank": 26, "stock_id": "3624", "name": "光頡", "score": 0.8822}, {"rank": 27, "stock_id": "2493", "name": "揚博", "score": 0.882}, {"rank": 28, "stock_id": "2351", "name": "順德", "score": 0.882}, {"rank": 29, "stock_id": "3581", "name": "博磊", "score": 0.8803}, {"rank": 30, "stock_id": "5289", "name": "宜鼎", "score": 0.8796}]}}, "paper": {"momentum_chips": {"start_date": "2026-07-09", "capital": 1000000, "cash": 136630, "pos_value": 742321, "nav": 878951, "total_return": -0.121, "bench_0050_return": -0.0624, "positions": [{"stock_id": "4127", "shares": 925, "avg_cost": 72.06, "close": 76.0, "value": 70300, "ret": 0.0547, "entry": "2026-07-13", "name": "天良"}, {"stock_id": "3374", "shares": 186, "avg_cost": 358.31, "close": 345.5, "value": 64263, "ret": -0.0357, "entry": "2026-07-13", "name": "精材"}, {"stock_id": "3583", "shares": 83, "avg_cost": 794.68, "close": 728.0, "value": 60424, "ret": -0.0839, "entry": "2026-07-13", "name": "辛耘"}, {"stock_id": "6213", "shares": 185, "avg_cost": 359.81, "close": 322.5, "value": 59662, "ret": -0.1037, "entry": "2026-07-13", "name": "聯茂"}, {"stock_id": "5464", "shares": 765, "avg_cost": 87.07, "close": 77.5, "value": 59288, "ret": -0.11, "entry": "2026-07-13", "name": "霖宏"}, {"stock_id": "7610", "shares": 27, "avg_cost": 2427.07, "close": 2170.0, "value": 58590, "ret": -0.1059, "entry": "2026-07-13", "name": "聯友金屬-創"}, {"stock_id": "3264", "shares": 296, "avg_cost": 225.19, "close": 197.5, "value": 58460, "ret": -0.123, "entry": "2026-07-13", "name": "欣銓"}, {"stock_id": "8046", "shares": 52, "avg_cost": 1271.09, "close": 1105.0, "value": 57460, "ret": -0.1307, "entry": "2026-07-13", "name": "南電"}, {"stock_id": "6672", "shares": 242, "avg_cost": 275.24, "close": 221.5, "value": 53603, "ret": -0.1952, "entry": "2026-07-13", "name": "騰輝電子-KY"}, {"stock_id": "6226", "shares": 2596, "avg_cost": 25.67, "close": 20.3, "value": 52699, "ret": -0.2093, "entry": "2026-07-13", "name": "光鼎"}, {"stock_id": "8438", "shares": 725, "avg_cost": 91.88, "close": 71.1, "value": 51547, "ret": -0.2262, "entry": "2026-07-13", "name": "昶昕"}, {"stock_id": "6831", "shares": 92, "avg_cost": 724.62, "close": 551.0, "value": 50692, "ret": -0.2396, "entry": "2026-07-13", "name": "邁科"}, {"stock_id": "3026", "shares": 73, "avg_cost": 905.77, "close": 621.0, "value": 45333, "ret": -0.3144, "entry": "2026-07-13", "name": "禾伸堂"}], "pending": null, "nav_history": [["2026-07-09", 1000000, 1000000], ["2026-07-13", 999262, 1001890], ["2026-07-14", 982968, 986767], ["2026-07-15", 1020755, 1004726], ["2026-07-16", 997961, 1005671], ["2026-07-17", 928138, 946597], ["2026-07-20", 878951, 937618]], "recent_trades": [{"date": "2026-07-13", "stock_id": "8438", "name": "昶昕", "action": "buy", "shares": 725, "price": 91.8, "note": ""}, {"date": "2026-07-13", "stock_id": "8046", "name": "南電", "action": "buy", "shares": 52, "price": 1270.0, "note": ""}, {"date": "2026-07-13", "stock_id": "7610", "name": "聯友金屬-創", "action": "buy", "shares": 27, "price": 2425.0, "note": ""}, {"date": "2026-07-13", "stock_id": "6831", "name": "邁科", "action": "buy", "shares": 92, "price": 724.0, "note": ""}, {"date": "2026-07-13", "stock_id": "6672", "name": "騰輝電子-KY", "action": "buy", "shares": 242, "price": 275.0, "note": ""}, {"date": "2026-07-13", "stock_id": "6226", "name": "光鼎", "action": "buy", "shares": 2596, "price": 25.65, "note": ""}, {"date": "2026-07-13", "stock_id": "6213", "name": "聯茂", "action": "buy", "shares": 185, "price": 359.5, "note": ""}, {"date": "2026-07-13", "stock_id": "5464", "name": "霖宏", "action": "buy", "shares": 765, "price": 87.0, "note": ""}, {"date": "2026-07-13", "stock_id": "4127", "name": "天良", "action": "buy", "shares": 925, "price": 72.0, "note": ""}, {"date": "2026-07-13", "stock_id": "3583", "name": "辛耘", "action": "buy", "shares": 83, "price": 794.0, "note": ""}, {"date": "2026-07-13", "stock_id": "3374", "name": "精材", "action": "buy", "shares": 186, "price": 358.0, "note": ""}, {"date": "2026-07-13", "stock_id": "3264", "name": "欣銓", "action": "buy", "shares": 296, "price": 225.0, "note": ""}]}}, "ic": {"momentum_chips": {"h5": {"latest_date": "2026-07-13", "latest": -0.3687, "mean60": -0.0161, "mean250": 0.0166, "pos250": 0.54, "tstat250": 1.69, "n_total": 2313}, "h21": {"latest_date": "2026-06-17", "latest": -0.332, "mean60": 0.0604, "mean250": 0.05, "pos250": 0.644, "tstat250": 6.89, "n_total": 2297}}}, "generated_at": "2026-07-21 14:21"};
+
+const fmt  = v => Math.round(v).toLocaleString("en-US");
+const fmt2 = v => v.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
+const wan  = v => (v/1e4).toFixed(1).replace(/\.0$/,"") + "萬";
+const cls  = v => v>0 ? "pos" : v<0 ? "neg" : "";
+const signedPct = v => (v>0?"+":v<0?"−":"") + Math.abs(v).toFixed(2) + "%";
+
+const NAV_GEO = {};
+function navChartSVG(p, key){
+  const hist = p.nav_history;
+  // viewBox 寬對齊手機實際顯示寬（卡片內容約 360px），文字才不會被縮小
+  const W=360, H=190, PL=8, PR=10, PT=24, PB=18;
+  const xs = hist.map(x=>x[1]), dates = hist.map(x=>x[0]), cap = p.capital;
+  const bs = hist.map(x=>x[2]==null?null:x[2]);
+  const hasBench = bs.some(v=>v!=null);
+  const all = xs.concat(bs.filter(v=>v!=null), cap);
+  let mn = Math.min(...all), mx = Math.max(...all);
+  const pad = (mx-mn)*0.14 || cap*0.01;
+  mn -= pad; mx += pad;
+  const X = i => PL + i*(W-PL-PR)/(xs.length-1);
+  const Y = v => PT + (mx-v)*(H-PT-PB)/(mx-mn);
+  NAV_GEO[key] = {xs, bs, dates, cap, W, PL, PR};
+
+  const raw = (mx-mn)/3, mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const step = [1,2,2.5,5,10].map(m=>m*mag).find(s=>s>=raw) || 10*mag;
+  let grid = "";
+  for(let v = Math.ceil(mn/step)*step; v < mx; v += step){
+    if(Math.abs(v-cap) < step*.5) continue;
+    grid += `<line x1="${PL}" x2="${W-PR}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--grid)" stroke-width="1"/>
+      <text x="${PL}" y="${Y(v)-4}">${wan(v)}</text>`;
+  }
+  grid += `<line x1="${PL}" x2="${W-PR}" y1="${Y(cap)}" y2="${Y(cap)}" stroke="var(--baseline)" stroke-width="1" stroke-dasharray="3 3"/>
+    <text x="${PL}" y="${Y(cap)-4}">本金 ${wan(cap)}</text>`;
+
+  const k = Math.max(1, Math.ceil(dates.length/6));
+  let xlab = "";
+  dates.forEach((d,i)=>{
+    const isLast = i===dates.length-1;
+    if(!isLast && (i%k || dates.length-1-i < k*.7)) return;
+    xlab += `<text x="${X(i)}" y="${H-4}" text-anchor="${i===0?"start":isLast?"end":"middle"}">${d.slice(5)}</text>`;
+  });
+
+  const dpath = "M"+xs.map((v,i)=>`${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join("L");
+  const ex = X(xs.length-1), ey = Y(xs[xs.length-1]);
+  const dots = xs.map((v,i)=>
+    `<circle cx="${X(i).toFixed(1)}" cy="${Y(v).toFixed(1)}" r="${i===xs.length-1?4:3}" fill="var(--accent)" stroke="var(--card)" stroke-width="2"/>`).join("");
+
+  let bpath = "", pen = false;
+  bs.forEach((v,i)=>{
+    if(v==null){ pen=false; return; }
+    bpath += `${pen?"L":"M"}${X(i).toFixed(1)},${Y(v).toFixed(1)}`;
+    pen = true;
+  });
+  const bench = hasBench ?
+    `<path d="${bpath}" fill="none" stroke="var(--muted)" stroke-width="1.6" opacity=".85" stroke-linejoin="round" stroke-linecap="round"/>` : "";
+  const legend = hasBench ?
+    `<div class="plegend"><span><i style="background:var(--accent)"></i>帳戶淨值</span>
+      <span><i style="background:var(--muted)"></i>0050 同期</span></div>` : "";
+
+  return `<div class="pnav" data-strat="${key}">${legend}
+    <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="虛擬帳戶淨值走勢（對比 0050）">
+      ${grid}
+      <path d="${dpath}L${ex},${Y(mn)}L${X(0)},${Y(mn)}Z" fill="var(--accent)" opacity=".08"/>
+      ${bench}
+      <path d="${dpath}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+      <line class="cursor" x1="0" x2="0" y1="${PT}" y2="${H-PB}" stroke="var(--baseline)" stroke-width="1" opacity="0"/>
+      ${dots}
+      <text class="endlbl" x="${ex-9}" y="${ey<PT+18?ey+18:ey-10}" text-anchor="end">${fmt(xs[xs.length-1])}</text>
+      ${xlab}
+    </svg></div>`;
+}
+
+function bindNavCharts(){
+  const tip = document.getElementById("tip");
+  document.querySelectorAll(".pnav").forEach(el=>{
+    const g = NAV_GEO[el.dataset.strat];
+    if(!g || g.xs.length < 2) return;
+    const svg = el.querySelector("svg"), cur = svg.querySelector(".cursor");
+    const dots = [...svg.querySelectorAll("circle")];
+    const show = (clientX, clientY)=>{
+      const b = svg.getBoundingClientRect();
+      const plw = b.width*(g.W-g.PL-g.PR)/g.W, pl = b.width*g.PL/g.W;
+      const fx = (clientX-b.left-pl)/plw;
+      const i = Math.max(0, Math.min(g.xs.length-1, Math.round(fx*(g.xs.length-1))));
+      cur.setAttribute("x1", dots[i].getAttribute("cx"));
+      cur.setAttribute("x2", dots[i].getAttribute("cx"));
+      cur.setAttribute("opacity", .8);
+      const r = (g.xs[i]/g.cap - 1)*100;
+      let html = `${g.dates[i].slice(5)}　<b>${fmt(g.xs[i])}</b>　` +
+        `<span class="${cls(r)}">${signedPct(r)}</span>`;
+      if(g.bs && g.bs[i]!=null){
+        const br = (g.bs[i]/g.cap - 1)*100;
+        html += `<span class="b">｜0050 <span class="${cls(br)}">${signedPct(br)}</span></span>`;
+      }
+      tip.innerHTML = html;
+      tip.style.display = "block";
+      tip.style.left = Math.max(6, Math.min(clientX-60, innerWidth-190))+"px";
+      tip.style.top  = (svg.getBoundingClientRect().top + window.scrollY < window.scrollY+60
+                        ? clientY+18 : svg.getBoundingClientRect().top - 30)+"px";
+    };
+    el.addEventListener("pointermove", ev=>show(ev.clientX, ev.clientY));
+    el.addEventListener("pointerdown", ev=>show(ev.clientX, ev.clientY));
+    el.addEventListener("pointerleave", ()=>{
+      cur.setAttribute("opacity",0); tip.style.display="none";
+    });
+  });
+}
+
+function render(){
+  const key = Object.keys(D.paper||{})[0];
+  const main = document.getElementById("main");
+  if(!key){ main.innerHTML = '<div class="card">尚無虛擬帳戶資料</div>'; return; }
+  const p = D.paper[key];
+  const ret = p.total_return*100;
+  const bench = p.bench_0050_return==null ? null : p.bench_0050_return*100;
+  const h = p.nav_history || [];
+  const day = h.length>1 ? (h[h.length-1][1]/h[h.length-2][1]-1)*100 : null;
+  document.getElementById("sub").textContent =
+    `${D.date}・策略 動能+籌碼・起始 ${p.start_date}・本金 ${fmt(p.capital)}`;
+
+  let html = `<div class="card"><div class="kpis">
+    <div class="kpi big"><div class="l">帳戶淨值</div><div class="v">${fmt(p.nav)}</div></div>
+    <div class="kpi big"><div class="l">累計報酬</div><div class="v ${cls(ret)}">${signedPct(ret)}</div></div>
+    <div class="kpi big"><div class="l">本日</div><div class="v ${cls(day)}">${day==null?"—":signedPct(day)}</div></div>
+    ${bench==null?"":`<div class="kpi"><div class="l">同期 0050</div><div class="v ${cls(bench)}">${signedPct(bench)}</div></div>`}
+    <div class="kpi"><div class="l">現金</div><div class="v">${fmt(p.cash)}</div></div>
+    <div class="kpi"><div class="l">持股市值</div><div class="v">${fmt(p.pos_value)}</div></div>
+  </div>`;
+  if(h.length > 1) html += navChartSVG(p, key);
+  html += `</div>`;
+
+  if(p.positions.length){
+    html += `<div class="card"><h2>持股 ${p.positions.length} 檔</h2>
+      <table><thead><tr><th class="l">商品</th><th>股數</th><th>收盤</th><th>市值</th><th>報酬</th></tr></thead><tbody>` +
+      p.positions.map(x=>{
+        const r = x.ret*100;
+        return `<tr><td class="l"><span class="nm">${x.name||"—"}</span><span class="cd">${x.stock_id}</span></td>
+          <td>${fmt(x.shares)}</td><td>${fmt2(x.close)}</td><td>${fmt(x.value)}</td>
+          <td class="${cls(r)}">${signedPct(r)}</td></tr>`;
+      }).join("") + `</tbody></table>`;
+    if(p.pending)
+      html += `<div class="pend">⏳ 調倉單待執行（訊號日 ${p.pending.sig_date}，下一交易日收盤成交）</div>`;
+    html += `</div>`;
+  }
+
+  const s = D.strategies && D.strategies[key];
+  if(s){
+    const held = new Set(p.positions.map(x=>x.stock_id));
+    const top = s.list.slice(0, s.top_n), watch = s.list.slice(s.top_n);
+    const mn = Math.min(...top.map(r=>r.score)), mx = Math.max(...top.map(r=>r.score));
+    html += `<div class="card"><h2>今日訊號 前 ${s.top_n} 名</h2>` +
+      top.map(r=>`<div class="srow"><span class="srank">${r.rank}</span>
+        <span class="sname">${r.name||r.stock_id}<span class="cd">${r.stock_id}</span>${held.has(r.stock_id)?'<span class="hold">持有</span>':""}</span>
+        <span class="sbar"><i style="width:${mx>mn?Math.round(8+92*(r.score-mn)/(mx-mn)):100}%"></i></span>
+        <span class="sscore">${r.score.toFixed(3)}</span></div>`).join("");
+    if(watch.length)
+      html += `<div class="watch"><b>觀察名單</b>　` +
+        watch.map(r=>`${r.rank}. ${r.name||r.stock_id}`).join("・") + `</div>`;
+    html += `</div>`;
+  }
+
+  const meta = [];
+  if(D.days_to_rebalance != null)
+    meta.push(D.days_to_rebalance === 0 ? "📅 今天是月底調倉日" :
+              `📅 距月底調倉日約 ${D.days_to_rebalance} 個交易日`);
+  const ic = D.ic && D.ic[key];
+  if(ic && ic.h21)
+    meta.push(`訊號預測力 21日IC 近一年均 ${ic.h21.mean250>=0?"+":"−"}${Math.abs(ic.h21.mean250).toFixed(3)}（正比率 ${(ic.h21.pos250*100).toFixed(0)}%）`);
+  if(D.generated_at) meta.push(`更新於 ${D.generated_at}`);
+  if(meta.length) html += `<div class="card meta">${meta.join("<br>")}</div>`;
+
+  main.innerHTML = html;
+  bindNavCharts();
+}
+render();
+</script>
+</body>
+</html>
